@@ -21,6 +21,16 @@
     (+= self.total total-incr)
     (.next (super) #* rest #** kwargs)))
 
+(defn dedup [i &optional [by (fn [i] i)]]
+  (setv seen (set)
+        adder seen.add)
+  (lfor
+    x i
+    :setv key (by x)
+    :if (not-in key seen)
+    :do (adder key)
+    x))
+
 (defn/a get-cosign-cookie [s]
   (await (.get s "https://weblogin.lancs.ac.uk/login/?cosign-https-lancaster.ombiel.co.uk&https://lancaster.ombiel.co.uk/campusm/sso/required/login/411")))
 
@@ -88,6 +98,7 @@
 
        (-> res
            (chain.from-iterable)
+           (dedup (fn [x] (get x "eventRef")))
            (list))))
 
 (defn/a get-events-from-now [s num-weeks]
