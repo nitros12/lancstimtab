@@ -96,10 +96,12 @@
 
        (with/a [n (trio.open-nursery)]
          (for [date d-iter]
-           (.start-soon n (fn/a []
-                            (let [evts (await (get-event s date))]
-                                 (.append res evts)
-                                 (.next bar (len evts)))))))
+           (.start-soon n
+                        (fn/a [date]
+                          (let [evts (await (get-event s date))]
+                               (.append res evts)
+                               (.next bar (len evts))))
+                        date)))
 
        (.finish bar)
 
