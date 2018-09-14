@@ -1,4 +1,6 @@
 # Lancaster University Timetable Dumper
+![PyPI](https://img.shields.io/pypi/v/lancstimtab.svg)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lancstimtab.svg)
 
 Useful for extracting your timetable into json, or org-mode format.
 

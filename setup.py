@@ -13,9 +13,11 @@ with open("requirements.txt") as f:
 
 setup(
     name="lancstimtab",
-    version="0.1.0",
+    version="0.1.1",
+    license="GPLv3",
     description="Lancaster University Timetable Dumper",
     author="Ben Simms",
+    url='https://github.com/nitros12/lancstimtab',
     packages=find_packages(),
     install_requires=requirements,
     include_package_data=True,
@@ -26,5 +28,11 @@ setup(
         "console_scripts": [
             "lancstimtab=lancstimtab.run:main"
         ]
-    }
+    },
+    classifiers=[
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Topic :: Utilities",
+    ]
 )
