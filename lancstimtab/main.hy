@@ -77,14 +77,21 @@
         json (.json resp)]
        (get json "events")))
 
-(defn datecode-gen [starting-datetime num-weeks]
+(defn datecode-gen [starting-date num-weeks]
   (setv delta (timedelta :weeks 1))
   (for [i (range num-weeks)]
-    (yield (+ starting-datetime (* delta i)))))
+    (yield (+ starting-date (* delta i)))))
 
-(defn/a get-events [s starting-datetime num-weeks]
+(defn week-start [date]
+  "get the date of the week starting the given date."
+  (let [weekday (.weekday date)
+        delta (timedelta :days weekday)
+        start (- date delta)]
+       start))
+
+(defn/a get-events [s starting-date num-weeks]
   (let [bar (MyBar "Getting events" :max num-weeks)
-        d-iter (datecode-gen starting-datetime num-weeks)
+        d-iter (datecode-gen (week-start starting-date) num-weeks)
         res (list)]
 
        (with/a [n (trio.open-nursery)]
