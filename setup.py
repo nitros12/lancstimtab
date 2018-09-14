@@ -13,7 +13,7 @@ with open("requirements.txt") as f:
 
 setup(
     name="lancstimtab",
-    version="0.1.1",
+    version="0.1.2",
     license="GPLv3",
     description="Lancaster University Timetable Dumper",
     author="Ben Simms",
