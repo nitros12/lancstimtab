@@ -128,8 +128,9 @@
         start-s (.strftime start "%Y-%m-%d %a %H:%S")
         end-s   (.strftime end "%H:%S")
         org-time (.format "<{}-{}>" start-s end-s)]
-       (.format (.join "\n" ["* {type}: {module}"
+       (.format (.join "\n" ["* {module}"
                              "  :PROPERTIES:"
+                             "  :CATEGORY: {type}"
                              "  :LOCATION: {room}, {location}, {code}"
                              "  :END:"
                              ""
