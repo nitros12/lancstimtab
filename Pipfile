@@ -4,14 +4,13 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-hy = "*"
-progress = "*"
-click = "*"
-trio = "*"
-asks = "*"
-
-[dev-packages]
-hy = "*"
+hy = ">=0.15"
+progress = ">=1.4"
+click = ">=6.7"
+trio = ">=0.7"
+asks = ">=2.0"
+ics = ">=0.4"
+arrow = ">=0.12.1"
 
 [requires]
 python_version = "3.7"

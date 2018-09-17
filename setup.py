@@ -3,9 +3,7 @@ from setuptools import setup, find_packages
 from codecs import open
 from os import path
 
-here = path.abspath(path.dirname(__file__))
-
-with open(path.join(here, "readme.md")) as f:
+with open("readme.md") as f:
     long_desc = f.read()
 
 with open("requirements.txt") as f:
@@ -13,7 +11,7 @@ with open("requirements.txt") as f:
 
 setup(
     name="lancstimtab",
-    version="0.1.2",
+    version="0.1.1",
     license="GPLv3",
     description="Lancaster University Timetable Dumper",
     author="Ben Simms",

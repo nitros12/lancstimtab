@@ -1,10 +1,11 @@
 (import sys
+        ics
         json
         trio
         asks
+        arrow
         click
-        [progress.bar [Bar]]
-        [datetime [date datetime timedelta]])
+        [progress.bar [Bar]])
 
 (require [hy.contrib.walk [*]])
 
@@ -49,24 +50,10 @@
        resp))
 
 (defn make-session []
-  (let [session (.Session
-                  asks
-                  :connections 10
-                  :persist-cookies True)]
-    (.headers.update
-      session
-      {"Connection" "keep-alive"
-       "Cache-Control" "max-age=0"
-       "Origin" "https://weblogin.lancs.ac.uk"
-       "Upgrade-Insecure-Requests" "1"
-       "DNT" "1"
-       "Content-Type" "application/x-www-form-urlencoded"
-       "User-Agent" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.92 Safari/537.36"
-       "Accept" "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8"
-       "Referer" "https://weblogin.lancs.ac.uk/login/?cosign-https-lancaster.ombiel.co.uk&https://lancaster.ombiel.co.uk/campusm/sso/required/login/411"
-       "Accept-Encoding" "gzip, deflate, br"
-       "Accept-Language" "en-GB,en-US;q=0.9,en;q=0.8"})
-    session))
+  (.Session
+    asks
+    :connections 10
+    :persist-cookies True))
 
 (defn/a get-event [s date]
   (let [tt (.timetuple date)
@@ -78,16 +65,13 @@
        (get json "events")))
 
 (defn datecode-gen [starting-date num-weeks]
-  (setv delta (timedelta :weeks 1))
   (for [i (range num-weeks)]
-    (yield (+ starting-date (* delta i)))))
+    (yield (.shift starting-date :weeks i))))
 
 (defn week-start [date]
   "get the date of the week starting the given date."
-  (let [weekday (.weekday date)
-        delta (timedelta :days weekday)
-        start (- date delta)]
-       start))
+  (.shift date
+          :days (- (.weekday date))))
 
 (defn/a get-events [s starting-date num-weeks]
   (let [bar (MyBar "Getting events" :max num-weeks)
@@ -99,35 +83,42 @@
            (.start-soon n
                         (fn/a [date]
                           (let [evts (await (get-event s date))]
-                               (.append res evts)
+                               (.extend res evts)
                                (.next bar (len evts))))
                         date)))
 
        (.finish bar)
 
        (-> res
-           (chain.from-iterable)
            (dedup (fn [x] (get x "eventRef")))
            (list))))
 
 (defn/a get-events-from-now [s num-weeks]
-  (let [now (date.today)]
+  (let [now (arrow.utcnow)]
        (await (get-events s now num-weeks))))
 
-(defn generate-org-entry [event]
-  (setv time-format "%Y-%m-%dT%H:%M:%S.%f%z"
-        known-fields ["eventRef" "desc1" "desc3" "calDate" "start" "end" "duration" "durationUnit"
-                      "teacherName" "teacherEmail" "locCode" "locAdd1" "locAdd2" "id"]
-        unknown-fields (lfor
-                         [k v] (event.items)
-                         :if (not-in k known-fields)
-                         (.format "{}: {}" k v)))
+(defn get-times [evt]
+  "Get the starting and ending datetimes of an event as a tuple of (start, end)."
+  (let [start (arrow.get (get evt "start"))
+        end   (arrow.get (get evt "end"))]
+       (, start end)))
 
-  (let [start (datetime.strptime (get event "start") time-format)
-        end   (datetime.strptime (get event "end")   time-format)
-        start-s (.strftime start "%Y-%m-%d %a %H:%S")
-        end-s   (.strftime end "%H:%S")
-        org-time (.format "<{}-{}>" start-s end-s)]
+(defn get-unknown-fields [evt]
+  "Get any fields we don't know from the event."
+  (setv known-fields ["eventRef" "desc1" "desc3" "calDate" "start" "end" "duration" "durationUnit"
+                      "teacherName" "teacherEmail" "locCode" "locAdd1" "locAdd2" "id"])
+  (lfor
+    [k v] (evt.items)
+    :if (not-in k known-fields)
+    (.format "{}: {}" k v)))
+
+(defn generate-org-entry [evt]
+  "Generate a single org entry for an event."
+  (setv [start end] (get-times evt))
+  (let [start-s (.format start "YYYY-MM-DD ddd HH:mm")
+        end-s   (.format end "HH:mm")
+        org-time (.format "<{}-{}>" start-s end-s)
+        unknown-fields (get-unknown-fields evt)]
        (.format (.join "\n" ["* {module}"
                              "  :PROPERTIES:"
                              "  :CATEGORY: {type}"
@@ -136,25 +127,62 @@
                              ""
                              "  {org_time}"
                              ""
-                             "Length: {duration} {duration_unit}"
                              "Teachers: {teachers}"
                              "Emails?: {emails}"
                              "Type: {type}"
                              "Module: {module}"
                              "Reference: {reference}"
                              "{extra}"])
-                :type          (get event "desc3")
-                :module        (get event "desc1")
-                :room          (get event "locAdd1")
-                :location      (get event "locAdd2")
-                :code          (get event "locCode")
-                :duration      (get event "duration")
-                :duration-unit (get event "durationUnit")
-                :teachers      (get event "teacherName")
-                :emails        (get event "teacherEmail")
-                :reference     (get event "eventRef")
+                :type          (get evt "desc3")
+                :module        (get evt "desc1")
+                :room          (get evt "locAdd1")
+                :location      (get evt "locAdd2")
+                :code          (get evt "locCode")
+                :duration      (get evt "duration")
+                :duration-unit (get evt "durationUnit")
+                :teachers      (get evt "teacherName")
+                :emails        (get evt "teacherEmail")
+                :reference     (get evt "eventRef")
                 :org-time org-time
                 :extra (.join "\n" unknown-fields))))
+
+(defn generate-ics-entry [evt]
+  "Generate a single ics entry for an event."
+  (setv [start end] (get-times evt))
+  (let [unknown-fields (get-unknown-fields evt)
+        module    (get evt "desc1")
+        room      (get evt "locAdd1")
+        location  (get evt "locAdd2")
+        code      (get evt "locCode")
+        type      (get evt "desc3")
+        reference (get evt "eventRef")
+        location-str (.format "{}, {}, {}" room location code)
+        desc-str (.format
+                   (.join "\n" ["Teachers: {teachers}"
+                                "Emails?: {emails}"
+                                "Type: {type}"
+                                "Module: {module}"
+                                "Reference: {reference}"
+                                "{extra}"])
+                   :teachers  (get evt "teacherName")
+                   :emails    (get evt "teacherEmail")
+                   :type      type
+                   :module    module
+                   :reference reference
+                   :extra (.join "\n" unknown-fields))]
+       (ics.Event
+         :name        module
+         :begin       start
+         :end         end
+         :uid         reference
+         :location    location-str
+         :description desc-str
+         :categories  (set [type]))))
+
+(defn generate-ics-calendar [events]
+  "Generate a ics format calendar from a list of events."
+  (ics.Calendar :events (lfor e events (generate-ics-entry e))))
+
 
 (defn/a a-main [user password num-weeks]
   (let [s (make-session)]
@@ -165,13 +193,14 @@
    (click.argument "user")
    (click.argument "password")
    (click.option "--weeks" "-w" :default 4 :help "Number of weeks to fetch")
-   (click.option "--org" "-o" :is-flag True)
-   (defn hy-main [user password weeks org]
+   (click.option "--format" "-f" :default "json" :type (click.Choice ["json" "org" "ics"]))
+   (defn hy-main [user password weeks format]
      (let [evts (trio.run a-main user password weeks)]
           (print
             (cond
-              [org (.join "\n" (map generate-org-entry evts))]
-              [True (json.dumps evts)])))))
+              [(= format "json") (json.dumps evts)]
+              [(= format "ics") (generate-ics-calendar evts)]
+              [(= format "org") (.join "\n" (map generate-org-entry evts))])))))
 
 (defmain [&rest _]
   (hy-main))
