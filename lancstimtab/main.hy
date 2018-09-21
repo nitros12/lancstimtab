@@ -47,6 +47,8 @@
          "doLogin" "Login"}
         resp (await (.post s "https://weblogin.lancs.ac.uk/login/"
                            :data data))]
+       (when (in "Lancaster University Login Page" resp.text)
+         (raise (Exception "Login details incorrect")))
        resp))
 
 (defn make-session []
